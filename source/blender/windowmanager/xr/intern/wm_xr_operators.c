@@ -38,6 +38,7 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+#include "wm_xr.h"
 
 #include "wm_xr_intern.h"
 

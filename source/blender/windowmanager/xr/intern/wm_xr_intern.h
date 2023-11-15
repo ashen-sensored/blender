@@ -8,9 +8,24 @@
 
 #include "CLG_log.h"
 
-#include "wm_xr.h"
+//#include "wm_xr.h"
+
+typedef void (*wmXrSessionExitFn)(const wmXrData *xr_data);
+
 
 struct wmXrActionSet;
+
+typedef struct wmXrPaintCursorData {
+  float cursor_location[3];
+  float cursor_scene_location[3];
+  float cursor_normal[3];
+  float active_object_to_world[4][4];
+  float cursor_radius;
+  float outline_col[3];
+  float outline_alpha;
+  float brush_alpha;
+  bool cursor_visible;
+} wmXrPaintCursorData;
 
 typedef struct wmXrSessionState {
   bool is_started;
@@ -59,7 +74,10 @@ typedef struct wmXrSessionState {
   struct wmXrActionSet *active_action_set;
   /* Name of the action set (if any) to activate before the next actions sync. */
   char active_action_set_next[64]; /* MAX_NAME */
+
+  wmXrPaintCursorData paint_cursor_data;
 } wmXrSessionState;
+
 
 typedef struct wmXrRuntimeData {
   GHOST_XrContextHandle context;
@@ -234,3 +252,4 @@ void wm_xr_pose_scale_to_imat(const GHOST_XrPose *pose, float scale, float r_ima
  */
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
 void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);
+

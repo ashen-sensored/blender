@@ -57,6 +57,8 @@
 /* still needed for sculpt_stroke_get_location, should be
  * removed eventually (TODO) */
 #include "sculpt_intern.hh"
+#include "xr/wm_xr_public.h"
+
 
 /* TODOs:
  *
@@ -1342,14 +1344,27 @@ static bool paint_cursor_context_init(bContext *C,
 
   return true;
 }
+//
+//typedef struct wmXrPaintCursorData {
+//  float cursor_location[3];
+//  float cursor_scene_location[3];
+//  float cursor_normal[3];
+//  float cursor_unprojected_radius;
+//  float active_object_to_world[4][4];
+//  bool cursor_visible;
+//} wmXrPaintCursorData;
+
+
 
 static void paint_cursor_update_pixel_radius(PaintCursorContext *pcontext)
 {
   if (pcontext->is_cursor_over_mesh) {
+    
     Brush *brush = BKE_paint_brush(pcontext->paint);
+    float unprojected_radius = BKE_brush_unprojected_radius_get(pcontext->scene, brush);
     pcontext->pixel_radius = project_brush_radius(
         &pcontext->vc,
-        BKE_brush_unprojected_radius_get(pcontext->scene, brush),
+        unprojected_radius,
         pcontext->location);
 
     if (pcontext->pixel_radius == 0) {
@@ -1578,6 +1593,38 @@ static void paint_cursor_preview_boundary_data_update(PaintCursorContext *pconte
       pcontext->vc.obact, pcontext->brush, ss->active_vertex, pcontext->radius);
 }
 
+static void wm_xr_paint_cursor_info_update(PaintCursorContext *pcontext)
+{
+  //if (pcontext->is_cursor_over_mesh) {
+    if (pcontext->wm->xr.runtime) {
+      wm_xr_handle_sculpt_cursor_info(pcontext->wm,
+                                      pcontext->location,
+                                      pcontext->scene_space_location,
+                                      pcontext->normal,
+                                      pcontext->vc.obact->object_to_world,
+                                      pcontext->radius,
+                                      pcontext->outline_col,
+                                      pcontext->outline_alpha,
+                                      pcontext->brush->alpha,
+                                      true);
+    }
+  }
+  //else {
+  //  if (pcontext->wm->xr.runtime) {
+  //    wm_xr_handle_sculpt_cursor_info(pcontext->wm,
+  //                                    pcontext->location,
+  //                                    pcontext->scene_space_location,
+  //                                    pcontext->normal,
+  //                                    pcontext->vc.obact->object_to_world,
+  //                                    pcontext->radius,
+  //                                    pcontext->outline_col,
+  //                                    pcontext->outline_alpha,
+  //                                    pcontext->brush->alpha,
+  //                                    false);
+  //  }
+  //}
+//}
+
 static void paint_cursor_draw_3d_view_brush_cursor_inactive(PaintCursorContext *pcontext)
 {
   Brush *brush = pcontext->brush;
@@ -1596,6 +1643,7 @@ static void paint_cursor_draw_3d_view_brush_cursor_inactive(PaintCursorContext *
 
   if (!pcontext->is_cursor_over_mesh) {
     paint_draw_3D_view_inactive_brush_cursor(pcontext);
+    //wm_xr_paint_cursor_info_update(pcontext);
     return;
   }
 
@@ -1603,6 +1651,9 @@ static void paint_cursor_draw_3d_view_brush_cursor_inactive(PaintCursorContext *
 
   const bool update_previews = pcontext->prev_active_vertex.i !=
                                SCULPT_active_vertex_get(pcontext->ss).i;
+
+  if (pcontext->is_cursor_over_mesh)
+  wm_xr_paint_cursor_info_update(pcontext);
 
   /* Setup drawing. */
   wmViewport(&pcontext->region->winrct);
@@ -1925,6 +1976,9 @@ static void paint_cursor_restore_drawing_state()
 static void paint_draw_cursor(bContext *C, int x, int y, void * /*unused*/)
 {
   PaintCursorContext pcontext;
+  if (CTX_wm_manager(C)->xr.runtime) {
+    wm_xr_handle_set_sculpt_cursor_active(CTX_wm_manager(C), false);
+  }
   if (!paint_cursor_context_init(C, x, y, &pcontext)) {
     return;
   }

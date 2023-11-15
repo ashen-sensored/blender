@@ -381,6 +381,82 @@ static void wm_xr_controller_aim_draw(const XrSessionSettings *settings, wmXrSes
   immUnbindProgram();
 }
 
+
+
+
+static void paint_cursor_drawing_setup_cursor_space(wmXrPaintCursorData *xr_paint_cursor_data)
+{
+  float cursor_trans[4][4], cursor_rot[4][4];
+  const float z_axis[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+  float quat[4];
+  copy_m4_m4(cursor_trans, xr_paint_cursor_data->active_object_to_world);
+  translate_m4(cursor_trans,
+               xr_paint_cursor_data->cursor_location[0],
+               xr_paint_cursor_data->cursor_location[1],
+               xr_paint_cursor_data->cursor_location[2]);
+  rotation_between_vecs_to_quat(quat, z_axis, xr_paint_cursor_data->cursor_normal);
+  quat_to_mat4(cursor_rot, quat);
+  GPU_matrix_mul(cursor_trans);
+  GPU_matrix_mul(cursor_rot);
+}
+
+// static void paint_cursor_draw_main_inactive_cursor(PaintCursorContext *pcontext)
+//{
+//   immUniformColor3fvAlpha(pcontext->outline_col, pcontext->outline_alpha);
+//   GPU_line_width(2.0f);
+//   imm_draw_circle_wire_3d(pcontext->pos, 0, 0, pcontext->radius, 80);
+//
+//   GPU_line_width(1.0f);
+//   immUniformColor3fvAlpha(pcontext->outline_col, pcontext->outline_alpha * 0.5f);
+//   imm_draw_circle_wire_3d(
+//       pcontext->pos, 0, 0, pcontext->radius * clamp_f(pcontext->brush->alpha, 0.0f, 1.0f), 80);
+// }
+
+static uint paint_cursor_setup_3D_drawing(void)
+{
+  GPU_line_width(2.0f);
+  GPU_blend(GPU_BLEND_ALPHA);
+  GPU_line_smooth(true);
+  uint pos_attr = GPU_vertformat_attr_add(
+      immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+  return pos_attr;
+}
+
+static void paint_cursor_restore_drawing_state()
+{
+  immUnbindProgram();
+  GPU_blend(GPU_BLEND_NONE);
+  GPU_line_smooth(false);
+}
+
+
+
+static void wm_xr_paint_cursor_draw(const XrSessionSettings *settings,
+                                    wmXrSessionState *state,
+                                    wmXrPaintCursorData *xr_paint_cursor_data)
+{
+  uint pos_attr = paint_cursor_setup_3D_drawing();
+  GPU_matrix_push();
+  paint_cursor_drawing_setup_cursor_space(xr_paint_cursor_data);
+
+     immUniformColor3fvAlpha(xr_paint_cursor_data->outline_col, xr_paint_cursor_data->outline_alpha);
+     GPU_line_width(2.0f);
+     imm_draw_circle_wire_3d(pos_attr, 0, 0, xr_paint_cursor_data->cursor_radius, 80);
+  
+     GPU_line_width(1.0f);
+     immUniformColor3fvAlpha(xr_paint_cursor_data->outline_col,
+                             xr_paint_cursor_data->outline_alpha * 0.5f);
+     imm_draw_circle_wire_3d(
+         pos_attr, 0, 0, xr_paint_cursor_data->cursor_radius * clamp_f(xr_paint_cursor_data->brush_alpha, 0.0f, 1.0f),
+         80);
+   
+  GPU_matrix_pop();
+
+  paint_cursor_restore_drawing_state();
+
+}
+
 void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), void *customdata)
 {
   wmXrData *xr = customdata;
@@ -388,6 +464,12 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
   GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrSessionState *state = &xr->runtime->session_state;
 
+  wmXrPaintCursorData *xr_paint_cursor_data = &xr->runtime->session_state.paint_cursor_data;
+
   wm_xr_controller_model_draw(settings, xr_context, state);
   wm_xr_controller_aim_draw(settings, state);
+  if (xr_paint_cursor_data->cursor_visible) {
+    wm_xr_paint_cursor_draw(settings, state, xr_paint_cursor_data);
+  }
+  
 }
